@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NPC Agent — DM Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #0d0d0f;
+            --surface:   #13131a;
+            --border:    #2a2a3a;
+            --border-hi: #3d3d55;
+            --gold:      #c9a84c;
+            --gold-dim:  #7a6030;
+            --red:       #c0392b;
+            --green:     #27ae60;
+            --text:      #d4cfc4;
+            --text-dim:  #6b6760;
+            --accent:    #7b68ee;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: 17px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* noise overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── Header ── */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 32px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, #16161f 0%, transparent 100%);
+            position: relative;
+            z-index: 1;
+        }
+
+        header h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            color: var(--gold);
+            text-transform: uppercase;
+        }
+
+        header h1 span {
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            letter-spacing: 0.08em;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            transition: background 0.4s;
+        }
+
+        .status-dot.connected    { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .status-dot.disconnected { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+        .status-dot.waiting      { background: var(--gold);  box-shadow: 0 0 6px var(--gold);
+                                   animation: pulse 1.4s ease-in-out infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.3; }
+        }
+
+        /* ── Main layout ── */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            gap: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* vertical divider */
+        main::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0; bottom: 0;
+            width: 1px;
+            background: linear-gradient(180deg, transparent, var(--border) 15%, var(--border) 85%, transparent);
+        }
+
+        /* ── Panel labels ── */
+        .panel-label {
+            padding: 14px 28px 10px;
+            font-family: 'Cinzel', serif;
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--gold-dim);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-label .badge {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border: 1px solid var(--border-hi);
+            border-radius: 2px;
+            color: var(--text-dim);
+            letter-spacing: 0.05em;
+        }
+
+        /* ── Content panels ── */
+        .panel-content {
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* player name row */
+        .player-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .player-row label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .player-row input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border-hi);
+            padding: 4px 0;
+            color: var(--text);
+            font-family: 'Cinzel', serif;
+            font-size: 0.85rem;
+            letter-spacing: 0.1em;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .player-row input:focus {
+            border-bottom-color: var(--gold);
+        }
+
+        /* profile row */
+        .profile-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .profile-row label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .profile-row input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border-hi);
+            padding: 4px 0;
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .profile-row input:focus {
+            border-bottom-color: var(--accent);
+        }
+
+        /* textareas */
+        textarea {
+            width: 100%;
+            flex: 1;
+            background: #0f0f16;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 14px 16px;
+            color: var(--text);
+            font-family: 'Crimson Pro', serif;
+            font-size: 1rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            min-height: 180px;
+        }
+
+        textarea:focus {
+            border-color: var(--border-hi);
+            box-shadow: 0 0 0 1px var(--border-hi) inset;
+        }
+
+        textarea::placeholder { color: var(--text-dim); font-style: italic; }
+
+        /* ── Footer action bars ── */
+        .panel-actions {
+            padding: 16px 28px 24px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── Buttons ── */
+        button {
+            font-family: 'Cinzel', serif;
+            font-size: 0.7rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 9px 20px;
+            border-radius: 2px;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.18s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: white;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        button:hover::after { opacity: 0.04; }
+        button:active::after { opacity: 0.08; }
+
+        .btn-primary {
+            background: var(--gold-dim);
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .btn-primary:hover {
+            background: #9a7a3a;
+            box-shadow: 0 0 12px rgba(201,168,76,0.2);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .btn-approve {
+            background: rgba(39,174,96,0.12);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .btn-approve:hover {
+            background: rgba(39,174,96,0.22);
+            box-shadow: 0 0 12px rgba(39,174,96,0.2);
+        }
+
+        .btn-approve:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .btn-danger {
+            background: rgba(192,57,43,0.1);
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .btn-danger:hover {
+            background: rgba(192,57,43,0.2);
+            box-shadow: 0 0 12px rgba(192,57,43,0.2);
+        }
+
+        .btn-danger:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .btn-ghost {
+            background: transparent;
+            border-color: var(--border-hi);
+            color: var(--text-dim);
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--text-dim);
+            color: var(--text);
+        }
+
+        /* ── Log strip ── */
+        #log-strip {
+            grid-column: 1 / -1;
+            border-top: 1px solid var(--border);
+            padding: 8px 28px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--text-dim);
+            letter-spacing: 0.05em;
+            min-height: 34px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #log-strip::before {
+            content: '›';
+            color: var(--gold-dim);
+        }
+
+        /* ── Fade in ── */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in { animation: fadeIn 0.3s ease forwards; }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>NPC Agent <span>/ DM Console</span></h1>
+    <div class="status">
+        <div class="status-dot disconnected" id="status-dot"></div>
+        <span id="status-text">DISCONNECTED</span>
+    </div>
+</header>
+
+<main>
+
+    <!-- ── LEFT: Input Panel ── -->
+    <div class="panel-label">
+        <span>Incoming Message</span>
+        <span class="badge" id="source-badge">DIRECT INPUT</span>
+    </div>
+
+    <div class="panel-label">
+        <span>Agent Response</span>
+        <span class="badge" id="response-badge">AWAITING</span>
+    </div>
+
+    <div class="panel-content">
+        <div class="player-row">
+            <label>PLAYER</label>
+            <input type="text" id="player-input" placeholder="Aragorn" />
+        </div>
+        <div class="profile-row">
+            <label>PROFILE</label>
+            <input type="text" id="profile-input" placeholder="riko" />
+        </div>
+        <textarea
+            id="message-input"
+            placeholder="Enter player message here, or wait for one from FoundryVTT..."
+        ></textarea>
+    </div>
+
+    <!-- ── RIGHT: Response Panel ── -->
+    <div class="panel-content">
+        <textarea
+            id="response-output"
+            class="response-text"
+            placeholder="Agent response will appear here..."
+            readonly
+        ></textarea>
+    </div>
+
+    <!-- ── LEFT: Actions ── -->
+    <div class="panel-actions">
+        <button class="btn-primary" id="btn-send" onclick="sendToLLM()">
+            Send to Agent
+        </button>
+        <button class="btn-ghost" id="btn-clear-input" onclick="clearInput()">
+            Clear
+        </button>
+    </div>
+
+    <!-- ── RIGHT: Actions ── -->
+    <div class="panel-actions">
+        <button class="btn-approve" id="btn-approve" onclick="approveResponse()" disabled>
+            Approve
+        </button>
+        <button class="btn-ghost" id="btn-edit" onclick="enableEdit()" disabled>
+            Edit
+        </button>
+        <button class="btn-danger" id="btn-regen" onclick="regenerate()" disabled>
+            Regenerate
+        </button>
+    </div>
+
+    <!-- ── Log strip ── -->
+    <div id="log-strip">Ready.</div>
+
+</main>
+
+<script>
+    // ── State ──
+    let ws = null;
+    let lastPlayer = null;
+    let lastProfile = null;
+    let lastMessage = null;
+    let responseApproved = false;
+	let pendingFromVTT = false;
+
+    // ── Elements ──
+    const statusDot    = document.getElementById('status-dot');
+    const statusText   = document.getElementById('status-text');
+    const sourceBadge  = document.getElementById('source-badge');
+    const responseBadge= document.getElementById('response-badge');
+    const playerInput  = document.getElementById('player-input');
+    const profileInput = document.getElementById('profile-input');
+    const messageInput = document.getElementById('message-input');
+    const responseOutput = document.getElementById('response-output');
+    const btnSend      = document.getElementById('btn-send');
+    const btnApprove   = document.getElementById('btn-approve');
+    const btnEdit      = document.getElementById('btn-edit');
+    const btnRegen     = document.getElementById('btn-regen');
+    const logStrip     = document.getElementById('log-strip');
+
+    // ── Logging ──
+    function log(msg) {
+        logStrip.textContent = msg;
+        logStrip.classList.remove('fade-in');
+        void logStrip.offsetWidth; // reflow to restart animation
+        logStrip.classList.add('fade-in');
+    }
+
+    // ── WebSocket ──
+    function connect() {
+		// Temporary early return to prevent constant reconnect attempts. Remove after VTT is setup
+		//return true;
+        const wsUrl = `ws://${window.location.host}/ws/dm`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            setStatus('connected', 'CONNECTED');
+            log('WebSocket connection established.');
+        };
+
+        ws.onclose = () => {
+            setStatus('disconnected', 'DISCONNECTED');
+            log('Connection lost. Retrying in 3s...');
+            setTimeout(connect, 3000);
+        };
+
+        ws.onerror = () => {
+            setStatus('disconnected', 'ERROR');
+            log('WebSocket error.');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+			if (data.type === "incoming_message") {
+				playerInput.value  = data.player  || '';
+				profileInput.value = data.profile || '';
+				messageInput.value = data.message || '';
+				sourceBadge.textContent = 'FROM FOUNDRYVTT';
+				pendingFromVTT = true;
+				log(`Message received from FoundryVTT — ${data.player}`);
+			}
+
+			if (data.type === "llm_response") {
+				pendingFromVTT = false;
+				setResponse(data.response);
+			}
+        };
+    }
+
+    function setStatus(state, label) {
+        statusDot.className = `status-dot ${state}`;
+        statusText.textContent = label;
+    }
+
+    // ── Send to LLM ──
+	async function sendToLLM() {
+		const player  = playerInput.value.trim();
+		const profile = profileInput.value.trim();
+		const message = messageInput.value.trim();
+
+		if (!player || !profile || !message) {
+			log('Player, profile, and message are all required.');
+			return;
+		}
+
+		// If no VTT message is pending, inject one manually via HTTP
+		// This supports standalone DM testing without FoundryVTT
+		if (!pendingFromVTT) {
+			btnSend.disabled = true;
+			responseBadge.textContent = 'GENERATING...';
+			setStatus('waiting', 'WAITING');
+			log(`Sending directly to agent as ${profile}...`);
+
+			try {
+				const res = await fetch('/chat', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ player, profile, message })
+				});
+				const data = await res.json();
+				if (!res.ok) {
+					log(`Error: ${data.detail || 'Unknown error'}`);
+					responseBadge.textContent = 'ERROR';
+					btnSend.disabled = false;
+					return;
+				}
+				setResponse(data.response);
+			} catch (err) {
+				log(`Request failed: ${err.message}`);
+				btnSend.disabled = false;
+			}
+			return;
+		}
+
+		// VTT message is pending — approve the (possibly edited) input
+		// and signal the queue to call the LLM
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			ws.send(JSON.stringify({
+				type:     "approved_response",
+				response: message
+			}));
+		}
+
+		btnSend.disabled = true;
+		responseBadge.textContent = 'GENERATING...';
+		log('Input approved. Waiting for LLM response...');
+	}
+
+    // ── Set response ──
+    function setResponse(text) {
+        responseOutput.value = text;
+        responseOutput.removeAttribute('readonly');
+        responseBadge.textContent = 'PENDING APPROVAL';
+        setStatus('connected', 'CONNECTED');
+        btnApprove.disabled = false;
+        btnEdit.disabled    = false;
+        btnRegen.disabled   = false;
+        btnSend.disabled    = false;
+        responseApproved    = false;
+        log('Response received. Awaiting DM approval.');
+    }
+
+	function approveResponse() {
+		const approved = responseOutput.value.trim();
+		if (!approved) return;
+
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			ws.send(JSON.stringify({
+				type:     "approved_response",
+				response: approved
+			}));
+		}
+
+		pendingFromVTT = false;
+		responseBadge.textContent = 'APPROVED';
+		btnApprove.disabled = true;
+		btnEdit.disabled    = true;
+		btnRegen.disabled   = true;
+		responseOutput.setAttribute('readonly', true);
+		log('Response approved and sent to FoundryVTT.');
+	}
+
+    // ── Edit ──
+    function enableEdit() {
+        responseOutput.removeAttribute('readonly');
+        responseOutput.focus();
+        log('Editing response...');
+    }
+
+    // ── Regenerate ──
+    async function regenerate() {
+        if (!lastPlayer || !lastProfile || !lastMessage) {
+            log('Nothing to regenerate.');
+            return;
+        }
+
+        responseBadge.textContent = 'REGENERATING...';
+        btnApprove.disabled = true;
+        btnEdit.disabled    = true;
+        btnRegen.disabled   = true;
+        btnSend.disabled    = true;
+        setStatus('waiting', 'WAITING');
+        log('Regenerating response...');
+
+        try {
+            const res = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    player:  lastPlayer,
+                    profile: lastProfile,
+                    message: lastMessage
+                })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                log(`Regeneration error: ${data.detail || 'Unknown error'}`);
+                responseBadge.textContent = 'ERROR';
+                setStatus('connected', 'CONNECTED');
+                btnRegen.disabled = false;
+                return;
+            }
+
+            setResponse(data.response);
+
+        } catch (err) {
+            log(`Regeneration failed: ${err.message}`);
+            responseBadge.textContent = 'ERROR';
+        }
+    }
+
+    // ── Clear input ──
+    function clearInput() {
+        playerInput.value  = '';
+        profileInput.value = '';
+        messageInput.value = '';
+        sourceBadge.textContent = 'DIRECT INPUT';
+        log('Input cleared.');
+    }
+
+    // ── Init ──
+    connect();
+</script>
+
+</body>
+</html>

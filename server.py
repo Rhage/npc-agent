@@ -1,0 +1,189 @@
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from chat_agent import ChatAgent
+from config import HOST, PORT
+import uvicorn
+import asyncio
+import json
+
+agent = ChatAgent()
+
+class PendingInterception:
+    def __init__(self):
+        self.player   = None
+        self.profile  = None
+        self.message  = None
+        self.response = None
+        self.event    = asyncio.Event()
+        self.active   = False
+
+    def reset(self):
+        self.player   = None
+        self.profile  = None
+        self.message  = None
+        self.response = None
+        self.event.clear()
+        self.active   = False
+
+pending = PendingInterception()
+message_queue = asyncio.Queue()
+
+# holds the active WebSocket connections
+dm_websocket  = None
+vtt_websocket = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(process_queue())
+    yield
+
+app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+class ChatRequest(BaseModel):
+    player:  str
+    profile: str
+    message: str
+
+@app.get("/dm")
+async def dm_console():
+    return FileResponse("static/dm.html")
+
+# ── WebSocket: DM Console ──
+@app.websocket("/ws/dm")
+async def ws_dm(websocket: WebSocket):
+    global dm_websocket
+    await websocket.accept()
+    dm_websocket = websocket
+    try:
+        while True:
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+
+            if msg["type"] == "approved_response":
+                # DM has approved — store the (possibly edited) response
+                # and signal FoundryVTT that it can proceed
+                pending.response = msg["response"]
+                pending.event.set()
+
+    except WebSocketDisconnect:
+        dm_websocket = None
+
+# ── WebSocket: FoundryVTT ──
+async def process_queue():
+    while True:
+        player, profile, message, websocket = await message_queue.get()
+
+        # Stage the message — no LLM call yet
+        formatted_input = agent.stage_message(player, profile, message)
+
+        # Set up pending interception
+        pending.reset()
+        pending.player   = player
+        pending.profile  = profile
+        pending.message  = formatted_input
+        pending.active   = True
+
+        # Forward to DM console for review
+        if dm_websocket:
+            await dm_websocket.send_text(json.dumps({
+                "type":    "incoming_message",
+                "player":  player,
+                "profile": profile,
+                "message": formatted_input
+            }))
+
+        # Wait for DM to approve the input
+        await pending.event.wait()
+
+        # NOW call the LLM with the (possibly edited) input
+        try:
+            response = agent.complete(profile, pending.message)
+        except Exception as e:
+            await websocket.send_text(json.dumps({
+                "type":   "error",
+                "detail": str(e)
+            }))
+            message_queue.task_done()
+            pending.reset()
+            continue
+
+        # Send the response back to DM for approval
+        pending.reset()
+        pending.response = response
+        pending.active   = True
+
+        if dm_websocket:
+            await dm_websocket.send_text(json.dumps({
+                "type":     "llm_response",
+                "response": response
+            }))
+
+        # Wait for DM to approve the response
+        await pending.event.wait()
+
+        # Send approved response to FoundryVTT
+        await websocket.send_text(json.dumps({
+            "type":     "agent_response",
+            "response": pending.response
+        }))
+
+        pending.reset()
+        message_queue.task_done()
+
+@app.websocket("/ws/vtt")
+async def ws_vtt(websocket: WebSocket):
+    global vtt_websocket
+    await websocket.accept()
+    vtt_websocket = websocket
+    try:
+        while True:
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+
+            if msg["type"] == "player_message":
+                # Just enqueue — don't process here
+                await message_queue.put((
+                    msg["player"],
+                    msg["profile"],
+                    msg["message"],
+                    websocket
+                ))
+
+    except WebSocketDisconnect:
+        vtt_websocket = None
+    
+# ── HTTP endpoints ──
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    try:
+        formatted_input = agent.stage_message(
+            player=request.player,
+            profile_name=request.profile,
+            message=request.message
+        )
+        response = agent.complete(
+            profile_name=request.profile,
+            formatted_input=formatted_input
+        )
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/message")
+async def message(request: ChatRequest):
+    try:
+        response = agent.respond_once(
+            player=request.player,
+            profile_name=request.profile,
+            message=request.message
+        )
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    uvicorn.run(app, host=HOST, port=PORT)

@@ -7,3 +7,6 @@ MODEL_NAME = os.getenv("MODEL_NAME", "your-model-name-here")
 LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234")
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))
+PASSTHROUGH = os.getenv("PASSTHROUGH", "false").lower() == "true"
+SSL_CERTFILE = os.getenv("SSL_CERTFILE", "")
+SSL_KEYFILE  = os.getenv("SSL_KEYFILE", "")

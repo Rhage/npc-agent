@@ -365,10 +365,19 @@
 
 <header>
     <h1>NPC Agent <span>/ DM Console</span></h1>
-    <div class="status">
-        <div class="status-dot disconnected" id="status-dot"></div>
-        <span id="status-text">DISCONNECTED</span>
-    </div>
+	<div style="display:flex; align-items:center; gap:16px;">
+		<button id="btn-passthrough" onclick="togglePassthrough()"
+			style="font-family:'Cinzel',serif; font-size:0.65rem; letter-spacing:0.12em;
+				   text-transform:uppercase; padding:6px 14px; border-radius:2px;
+				   background:transparent; border:1px solid var(--border-hi);
+				   color:var(--text-dim); cursor:pointer;">
+			Passthrough: OFF
+		</button>
+		<div class="status">
+			<div class="status-dot disconnected" id="status-dot"></div>
+			<span id="status-text">DISCONNECTED</span>
+		</div>
+	</div>
 </header>
 
 <main>
@@ -470,11 +479,10 @@
     }
 
     // ── WebSocket ──
-    function connect() {
-		// Temporary early return to prevent constant reconnect attempts. Remove after VTT is setup
-		//return true;
-        const wsUrl = `ws://${window.location.host}/ws/dm`;
-        ws = new WebSocket(wsUrl);
+	function connect() {
+		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+		const wsUrl = `${protocol}//${window.location.host}/ws/dm`;
+		ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
             setStatus('connected', 'CONNECTED');
@@ -664,6 +672,33 @@
         log('Input cleared.');
     }
 
+	let passthroughEnabled = false;
+
+	async function togglePassthrough() {
+		passthroughEnabled = !passthroughEnabled;
+
+		try {
+			await fetch(`/passthrough?enabled=${passthroughEnabled}`, {
+				method: 'POST'
+			});
+
+			const btn = document.getElementById('btn-passthrough');
+			if (passthroughEnabled) {
+				btn.textContent   = 'Passthrough: ON';
+				btn.style.color   = 'var(--green)';
+				btn.style.borderColor = 'var(--green)';
+				log('Passthrough enabled — responses will flow directly to FoundryVTT.');
+			} else {
+				btn.textContent   = 'Passthrough: OFF';
+				btn.style.color   = 'var(--text-dim)';
+				btn.style.borderColor = 'var(--border-hi)';
+				log('Passthrough disabled — DM approval required.');
+			}
+		} catch (err) {
+			log(`Failed to toggle passthrough: ${err.message}`);
+			passthroughEnabled = !passthroughEnabled; // revert on failure
+		}
+	}
     // ── Init ──
     connect();
 </script>

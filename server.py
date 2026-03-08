@@ -111,6 +111,9 @@ async def process_queue():
             pending.reset()
             continue
 
+        # store the profile locally before resetting
+        approved_profile = pending.profile
+
         # Send the response back to DM for approval
         pending.reset()
         pending.response = response
@@ -128,7 +131,9 @@ async def process_queue():
         # Send approved response to FoundryVTT
         await websocket.send_text(json.dumps({
             "type":     "agent_response",
-            "response": pending.response
+            "response": pending.response,
+            "profile":  approved_profile,
+            "player": player
         }))
 
         pending.reset()

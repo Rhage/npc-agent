@@ -29,6 +29,7 @@ class PendingInterception:
         self.active   = False
 
 pending = PendingInterception()
+passthrough = False
 message_queue = asyncio.Queue()
 
 # holds the active WebSocket connections
@@ -77,66 +78,69 @@ async def process_queue():
     while True:
         player, profile, message, websocket = await message_queue.get()
 
-        # Stage the message — no LLM call yet
         formatted_input = agent.stage_message(player, profile, message)
+        approved_profile = profile
 
-        # Set up pending interception
-        pending.reset()
-        pending.player   = player
-        pending.profile  = profile
-        pending.message  = formatted_input
-        pending.active   = True
+        if not passthrough:
+            # Step 1 — DM reviews input
+            pending.reset()
+            pending.player  = player
+            pending.profile = profile
+            pending.message = formatted_input
+            pending.active  = True
 
-        # Forward to DM console for review
-        if dm_websocket:
-            await dm_websocket.send_text(json.dumps({
-                "type":    "incoming_message",
-                "player":  player,
-                "profile": profile,
-                "message": formatted_input
-            }))
+            # Forward to DM console for review
+            if dm_websocket:
+                await dm_websocket.send_text(json.dumps({
+                    "type":    "incoming_message",
+                    "player":  player,
+                    "profile": profile,
+                    "message": formatted_input
+                }))
 
-        # Wait for DM to approve the input
-        await pending.event.wait()
+            await pending.event.wait()
+            formatted_input = pending.message
 
-        # NOW call the LLM with the (possibly edited) input
+        # Call LLM with approved (or unmodified) input
         try:
-            response = agent.complete(profile, pending.message)
+            response = agent.complete(
+                profile_name=profile,
+                formatted_input=formatted_input
+            )
         except Exception as e:
             await websocket.send_text(json.dumps({
                 "type":   "error",
                 "detail": str(e)
             }))
             message_queue.task_done()
-            pending.reset()
+            if not passthrough:
+                pending.reset()
             continue
 
-        # store the profile locally before resetting
-        approved_profile = pending.profile
+        if not passthrough:
+            # Step 2 — DM reviews response
+            pending.reset()
+            pending.response = response
+            pending.active   = True
 
-        # Send the response back to DM for approval
-        pending.reset()
-        pending.response = response
-        pending.active   = True
+            if dm_websocket:
+                await dm_websocket.send_text(json.dumps({
+                    "type":     "llm_response",
+                    "response": response
+                }))
 
-        if dm_websocket:
-            await dm_websocket.send_text(json.dumps({
-                "type":     "llm_response",
-                "response": response
-            }))
+            await pending.event.wait()
+            response = pending.response
+            pending.reset()
 
-        # Wait for DM to approve the response
-        await pending.event.wait()
-
-        # Send approved response to FoundryVTT
+        # Send to FoundryVTT
         await websocket.send_text(json.dumps({
             "type":     "agent_response",
-            "response": pending.response,
+            "response": response,
             "profile":  approved_profile,
-            "player": player
+            "player":   player
         }))
 
-        pending.reset()
         message_queue.task_done()
 
 @app.websocket("/ws/vtt")
@@ -190,5 +194,11 @@ async def message(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/passthrough")
+async def set_passthrough(enabled: bool):
+    global passthrough
+    passthrough = enabled
+    return {"passthrough": passthrough}
+    
 if __name__ == "__main__":
     uvicorn.run(app, host=HOST, port=PORT)

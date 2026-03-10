@@ -17,6 +17,7 @@ class PendingInterception:
         self.profile  = None
         self.message  = None
         self.response = None
+        self.user_id  = None
         self.event    = asyncio.Event()
         self.active   = False
 
@@ -25,6 +26,7 @@ class PendingInterception:
         self.profile  = None
         self.message  = None
         self.response = None
+        self.user_id  = None
         self.event.clear()
         self.active   = False
 
@@ -76,7 +78,7 @@ async def ws_dm(websocket: WebSocket):
 # ── WebSocket: FoundryVTT ──
 async def process_queue():
     while True:
-        player, profile, message, websocket = await message_queue.get()
+        player, profile, message, user_id, websocket = await message_queue.get()
 
         formatted_input = agent.stage_message(player, profile, message)
         approved_profile = profile
@@ -88,6 +90,7 @@ async def process_queue():
             pending.profile = profile
             pending.message = formatted_input
             pending.active  = True
+            pending.user_id  = user_id
 
             # Forward to DM console for review
             if dm_websocket:
@@ -138,7 +141,8 @@ async def process_queue():
             "type":     "agent_response",
             "response": response,
             "profile":  approved_profile,
-            "player":   player
+            "player":   player,
+            "userId":   user_id
         }))
 
         message_queue.task_done()
@@ -159,6 +163,7 @@ async def ws_vtt(websocket: WebSocket):
                     msg["player"],
                     msg["profile"],
                     msg["message"],
+                    msg.get("userId"),
                     websocket
                 ))
 

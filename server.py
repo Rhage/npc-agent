@@ -64,8 +64,6 @@ vtt_websocket = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     asyncio.create_task(process_queue())
-    if tts_enabled and voice_manager.available and FOUNDRY_AUDIO_OUTPUT_PATH:
-        asyncio.create_task(voice_manager.warmup())
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -105,7 +103,7 @@ async def ws_dm(websocket: WebSocket):
 # ── Queue processor ──
 async def process_queue():
     while True:
-        player, profile_name, message, user_id, websocket = await message_queue.get()
+        player, profile_name, message, user_id, context, websocket = await message_queue.get()
 
         formatted_input  = agent.stage_message(player, profile_name, message)
         approved_profile = profile_name
@@ -134,7 +132,8 @@ async def process_queue():
         try:
             response = agent.complete(
                 profile_name=profile_name,
-                formatted_input=formatted_input
+                formatted_input=formatted_input,
+                context=context
             )
         except Exception as e:
             await websocket.send_text(json.dumps({
@@ -201,11 +200,13 @@ async def ws_vtt(websocket: WebSocket):
             msg  = json.loads(data)
 
             if msg["type"] == "player_message":
+                print(f"[Server] Received message for profile: '{msg['profile']}'")
                 await message_queue.put((
                     msg["player"],
                     msg["profile"],
                     msg["message"],
                     msg.get("userId"),
+                    msg.get("context"),
                     websocket
                 ))
 

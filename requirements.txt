@@ -1,6 +1,23 @@
+# ── Core server ──
 fastapi==0.135.1
 uvicorn==0.41.0
 python-dotenv==1.2.1
 requests==2.32.4
 aiofiles==25.1.0
 websockets==16.0
+
+# ── TTS ──
+# Install faster-qwen3-tts and qwen-tts from their respective sources.
+# See README for install instructions — these are not on PyPI.
+# faster-qwen3-tts  (CUDA graph accelerated inference)
+# qwen-tts          (VoiceDesign model — used only during setup_voices.py)
+
+numpy
+soundfile
+pydub
+
+# Flash Attention 2 (strongly recommended — reduces VRAM, speeds up generation)
+# Install separately due to build requirements:
+#   pip install flash-attn --no-build-isolation
+# If RAM is limited (<96GB):
+#   MAX_JOBS=4 pip install flash-attn --no-build-isolation

@@ -32,7 +32,6 @@
             flex-direction: column;
         }
 
-        /* noise overlay */
         body::before {
             content: '';
             position: fixed;
@@ -66,6 +65,31 @@
         header h1 span {
             color: var(--text-dim);
             font-weight: 400;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toggle-btn {
+            font-family: 'Cinzel', serif;
+            font-size: 0.65rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 2px;
+            background: transparent;
+            border: 1px solid var(--border-hi);
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.18s;
+        }
+
+        .toggle-btn.active {
+            color: var(--green);
+            border-color: var(--green);
         }
 
         .status {
@@ -107,7 +131,6 @@
             z-index: 1;
         }
 
-        /* vertical divider */
         main::after {
             content: '';
             position: absolute;
@@ -149,14 +172,13 @@
             gap: 16px;
         }
 
-        /* player name row */
-        .player-row {
+        .player-row, .profile-row {
             display: flex;
             align-items: center;
             gap: 12px;
         }
 
-        .player-row label {
+        .player-row label, .profile-row label {
             font-family: 'Share Tech Mono', monospace;
             font-size: 0.7rem;
             color: var(--text-dim);
@@ -178,24 +200,7 @@
             transition: border-color 0.2s;
         }
 
-        .player-row input:focus {
-            border-bottom-color: var(--gold);
-        }
-
-        /* profile row */
-        .profile-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .profile-row label {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            letter-spacing: 0.1em;
-            white-space: nowrap;
-        }
+        .player-row input:focus { border-bottom-color: var(--gold); }
 
         .profile-row input {
             flex: 1;
@@ -210,11 +215,8 @@
             transition: border-color 0.2s;
         }
 
-        .profile-row input:focus {
-            border-bottom-color: var(--accent);
-        }
+        .profile-row input:focus { border-bottom-color: var(--accent); }
 
-        /* textareas */
         textarea {
             width: 100%;
             flex: 1;
@@ -271,7 +273,7 @@
             transition: opacity 0.15s;
         }
 
-        button:hover::after { opacity: 0.04; }
+        button:hover::after  { opacity: 0.04; }
         button:active::after { opacity: 0.08; }
 
         .btn-primary {
@@ -285,10 +287,7 @@
             box-shadow: 0 0 12px rgba(201,168,76,0.2);
         }
 
-        .btn-primary:disabled {
-            opacity: 0.35;
-            cursor: not-allowed;
-        }
+        .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
 
         .btn-approve {
             background: rgba(39,174,96,0.12);
@@ -327,6 +326,21 @@
             color: var(--text);
         }
 
+        .btn-ghost:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .btn-voice {
+            background: rgba(123,104,238,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-voice:hover {
+            background: rgba(123,104,238,0.2);
+            box-shadow: 0 0 12px rgba(123,104,238,0.2);
+        }
+
+        .btn-voice:disabled { opacity: 0.35; cursor: not-allowed; }
+
         /* ── Log strip ── */
         #log-strip {
             grid-column: 1 / -1;
@@ -347,7 +361,6 @@
             color: var(--gold-dim);
         }
 
-        /* ── Fade in ── */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(6px); }
             to   { opacity: 1; transform: translateY(0); }
@@ -355,7 +368,6 @@
 
         .fade-in { animation: fadeIn 0.3s ease forwards; }
 
-        /* ── Scrollbar ── */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
@@ -365,19 +377,14 @@
 
 <header>
     <h1>NPC Agent <span>/ DM Console</span></h1>
-	<div style="display:flex; align-items:center; gap:16px;">
-		<button id="btn-passthrough" onclick="togglePassthrough()"
-			style="font-family:'Cinzel',serif; font-size:0.65rem; letter-spacing:0.12em;
-				   text-transform:uppercase; padding:6px 14px; border-radius:2px;
-				   background:transparent; border:1px solid var(--border-hi);
-				   color:var(--text-dim); cursor:pointer;">
-			Passthrough: OFF
-		</button>
-		<div class="status">
-			<div class="status-dot disconnected" id="status-dot"></div>
-			<span id="status-text">DISCONNECTED</span>
-		</div>
-	</div>
+    <div class="header-controls">
+        <button id="btn-tts" class="toggle-btn" onclick="toggleTTS()">Voice: ON</button>
+        <button id="btn-passthrough" class="toggle-btn" onclick="togglePassthrough()">Passthrough: OFF</button>
+        <div class="status">
+            <div class="status-dot disconnected" id="status-dot"></div>
+            <span id="status-text">DISCONNECTED</span>
+        </div>
+    </div>
 </header>
 
 <main>
@@ -420,25 +427,16 @@
 
     <!-- ── LEFT: Actions ── -->
     <div class="panel-actions">
-        <button class="btn-primary" id="btn-send" onclick="sendToLLM()">
-            Send to Agent
-        </button>
-        <button class="btn-ghost" id="btn-clear-input" onclick="clearInput()">
-            Clear
-        </button>
+        <button class="btn-primary" id="btn-send" onclick="sendToLLM()">Send to Agent</button>
+        <button class="btn-voice"   id="btn-prepare" onclick="prepareVoice()">Prep Voice</button>
+        <button class="btn-ghost"   id="btn-clear-input" onclick="clearInput()">Clear</button>
     </div>
 
     <!-- ── RIGHT: Actions ── -->
     <div class="panel-actions">
-        <button class="btn-approve" id="btn-approve" onclick="approveResponse()" disabled>
-            Approve
-        </button>
-        <button class="btn-ghost" id="btn-edit" onclick="enableEdit()" disabled>
-            Edit
-        </button>
-        <button class="btn-danger" id="btn-regen" onclick="regenerate()" disabled>
-            Regenerate
-        </button>
+        <button class="btn-approve" id="btn-approve" onclick="approveResponse()" disabled>Approve</button>
+        <button class="btn-ghost"   id="btn-edit"    onclick="enableEdit()"      disabled>Edit</button>
+        <button class="btn-danger"  id="btn-regen"   onclick="regenerate()"      disabled>Regenerate</button>
     </div>
 
     <!-- ── Log strip ── -->
@@ -449,39 +447,40 @@
 <script>
     // ── State ──
     let ws = null;
-    let lastPlayer = null;
-    let lastProfile = null;
-    let lastMessage = null;
+    let lastPlayer       = null;
+    let lastProfile      = null;
+    let lastMessage      = null;
     let responseApproved = false;
-	let pendingFromVTT = false;
+    let pendingFromVTT   = false;
+    let passthroughEnabled = false;
+    let ttsEnabled         = true;
 
     // ── Elements ──
-    const statusDot    = document.getElementById('status-dot');
-    const statusText   = document.getElementById('status-text');
-    const sourceBadge  = document.getElementById('source-badge');
-    const responseBadge= document.getElementById('response-badge');
-    const playerInput  = document.getElementById('player-input');
-    const profileInput = document.getElementById('profile-input');
-    const messageInput = document.getElementById('message-input');
+    const statusDot      = document.getElementById('status-dot');
+    const statusText     = document.getElementById('status-text');
+    const sourceBadge    = document.getElementById('source-badge');
+    const responseBadge  = document.getElementById('response-badge');
+    const playerInput    = document.getElementById('player-input');
+    const profileInput   = document.getElementById('profile-input');
+    const messageInput   = document.getElementById('message-input');
     const responseOutput = document.getElementById('response-output');
-    const btnSend      = document.getElementById('btn-send');
-    const btnApprove   = document.getElementById('btn-approve');
-    const btnEdit      = document.getElementById('btn-edit');
-    const btnRegen     = document.getElementById('btn-regen');
-    const logStrip     = document.getElementById('log-strip');
+    const btnSend        = document.getElementById('btn-send');
+    const btnPrepare     = document.getElementById('btn-prepare');
+    const btnApprove     = document.getElementById('btn-approve');
+    const btnEdit        = document.getElementById('btn-edit');
+    const btnRegen       = document.getElementById('btn-regen');
+    const logStrip       = document.getElementById('log-strip');
 
     // ── Logging ──
     function log(msg) {
         logStrip.textContent = msg;
         logStrip.classList.remove('fade-in');
-        void logStrip.offsetWidth; // reflow to restart animation
+        void logStrip.offsetWidth;
         logStrip.classList.add('fade-in');
     }
 
     // ── WebSocket ──
     function connect() {
-		// Temporary early return to prevent constant reconnect attempts. Remove after VTT is setup
-		//return true;
         const wsUrl = `ws://${window.location.host}/ws/dm`;
         ws = new WebSocket(wsUrl);
 
@@ -504,19 +503,19 @@
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
-			if (data.type === "incoming_message") {
-				playerInput.value  = data.player  || '';
-				profileInput.value = data.profile || '';
-				messageInput.value = data.message || '';
-				sourceBadge.textContent = 'FROM FOUNDRYVTT';
-				pendingFromVTT = true;
-				log(`Message received from FoundryVTT — ${data.player}`);
-			}
+            if (data.type === "incoming_message") {
+                playerInput.value  = data.player  || '';
+                profileInput.value = data.profile || '';
+                messageInput.value = data.message || '';
+                sourceBadge.textContent = 'FROM FOUNDRYVTT';
+                pendingFromVTT = true;
+                log(`Message received from FoundryVTT — ${data.player}`);
+            }
 
-			if (data.type === "llm_response") {
-				pendingFromVTT = false;
-				setResponse(data.response);
-			}
+            if (data.type === "llm_response") {
+                pendingFromVTT = false;
+                setResponse(data.response);
+            }
         };
     }
 
@@ -526,58 +525,55 @@
     }
 
     // ── Send to LLM ──
-	async function sendToLLM() {
-		const player  = playerInput.value.trim();
-		const profile = profileInput.value.trim();
-		const message = messageInput.value.trim();
+    async function sendToLLM() {
+        const player  = playerInput.value.trim();
+        const profile = profileInput.value.trim();
+        const message = messageInput.value.trim();
 
-		if (!player || !profile || !message) {
-			log('Player, profile, and message are all required.');
-			return;
-		}
+        if (!player || !profile || !message) {
+            log('Player, profile, and message are all required.');
+            return;
+        }
 
-		// If no VTT message is pending, inject one manually via HTTP
-		// This supports standalone DM testing without FoundryVTT
-		if (!pendingFromVTT) {
-			btnSend.disabled = true;
-			responseBadge.textContent = 'GENERATING...';
-			setStatus('waiting', 'WAITING');
-			log(`Sending directly to agent as ${profile}...`);
+        if (!pendingFromVTT) {
+            btnSend.disabled = true;
+            responseBadge.textContent = 'GENERATING...';
+            setStatus('waiting', 'WAITING');
+            log(`Sending directly to agent as ${profile}...`);
 
-			try {
-				const res = await fetch('/chat', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ player, profile, message })
-				});
-				const data = await res.json();
-				if (!res.ok) {
-					log(`Error: ${data.detail || 'Unknown error'}`);
-					responseBadge.textContent = 'ERROR';
-					btnSend.disabled = false;
-					return;
-				}
-				setResponse(data.response);
-			} catch (err) {
-				log(`Request failed: ${err.message}`);
-				btnSend.disabled = false;
-			}
-			return;
-		}
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ player, profile, message })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    log(`Error: ${data.detail || 'Unknown error'}`);
+                    responseBadge.textContent = 'ERROR';
+                    btnSend.disabled = false;
+                    return;
+                }
+                setResponse(data.response);
+            } catch (err) {
+                log(`Request failed: ${err.message}`);
+                btnSend.disabled = false;
+            }
+            return;
+        }
 
-		// VTT message is pending — approve the (possibly edited) input
-		// and signal the queue to call the LLM
-		if (ws && ws.readyState === WebSocket.OPEN) {
-			ws.send(JSON.stringify({
-				type:     "approved_response",
-				response: message
-			}));
-		}
+        // VTT message pending — approve the (possibly edited) input
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type:     "approved_response",
+                response: message
+            }));
+        }
 
-		btnSend.disabled = true;
-		responseBadge.textContent = 'GENERATING...';
-		log('Input approved. Waiting for LLM response...');
-	}
+        btnSend.disabled = true;
+        responseBadge.textContent = 'GENERATING...';
+        log('Input approved. Waiting for LLM response...');
+    }
 
     // ── Set response ──
     function setResponse(text) {
@@ -593,25 +589,26 @@
         log('Response received. Awaiting DM approval.');
     }
 
-	function approveResponse() {
-		const approved = responseOutput.value.trim();
-		if (!approved) return;
+    // ── Approve ──
+    function approveResponse() {
+        const approved = responseOutput.value.trim();
+        if (!approved) return;
 
-		if (ws && ws.readyState === WebSocket.OPEN) {
-			ws.send(JSON.stringify({
-				type:     "approved_response",
-				response: approved
-			}));
-		}
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type:     "approved_response",
+                response: approved
+            }));
+        }
 
-		pendingFromVTT = false;
-		responseBadge.textContent = 'APPROVED';
-		btnApprove.disabled = true;
-		btnEdit.disabled    = true;
-		btnRegen.disabled   = true;
-		responseOutput.setAttribute('readonly', true);
-		log('Response approved and sent to FoundryVTT.');
-	}
+        pendingFromVTT = false;
+        responseBadge.textContent = 'APPROVED';
+        btnApprove.disabled = true;
+        btnEdit.disabled    = true;
+        btnRegen.disabled   = true;
+        responseOutput.setAttribute('readonly', true);
+        log('Response approved and sent to FoundryVTT.');
+    }
 
     // ── Edit ──
     function enableEdit() {
@@ -657,7 +654,6 @@
             }
 
             setResponse(data.response);
-
         } catch (err) {
             log(`Regeneration failed: ${err.message}`);
             responseBadge.textContent = 'ERROR';
@@ -673,35 +669,87 @@
         log('Input cleared.');
     }
 
-	let passthroughEnabled = false;
+    // ── Passthrough toggle ──
+    async function togglePassthrough() {
+        passthroughEnabled = !passthroughEnabled;
 
-	async function togglePassthrough() {
-		passthroughEnabled = !passthroughEnabled;
+        try {
+            await fetch(`/passthrough?enabled=${passthroughEnabled}`, { method: 'POST' });
 
-		try {
-			await fetch(`/passthrough?enabled=${passthroughEnabled}`, {
-				method: 'POST'
-			});
+            const btn = document.getElementById('btn-passthrough');
+            if (passthroughEnabled) {
+                btn.classList.add('active');
+                btn.textContent = 'Passthrough: ON';
+                log('Passthrough enabled — responses will flow directly to FoundryVTT.');
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = 'Passthrough: OFF';
+                log('Passthrough disabled — DM approval required.');
+            }
+        } catch (err) {
+            log(`Failed to toggle passthrough: ${err.message}`);
+            passthroughEnabled = !passthroughEnabled;
+        }
+    }
 
-			const btn = document.getElementById('btn-passthrough');
-			if (passthroughEnabled) {
-				btn.textContent   = 'Passthrough: ON';
-				btn.style.color   = 'var(--green)';
-				btn.style.borderColor = 'var(--green)';
-				log('Passthrough enabled — responses will flow directly to FoundryVTT.');
-			} else {
-				btn.textContent   = 'Passthrough: OFF';
-				btn.style.color   = 'var(--text-dim)';
-				btn.style.borderColor = 'var(--border-hi)';
-				log('Passthrough disabled — DM approval required.');
-			}
-		} catch (err) {
-			log(`Failed to toggle passthrough: ${err.message}`);
-			passthroughEnabled = !passthroughEnabled; // revert on failure
-		}
-	}
-	
+    // ── TTS toggle ──
+    async function toggleTTS() {
+        ttsEnabled = !ttsEnabled;
+
+        try {
+            await fetch(`/tts?enabled=${ttsEnabled}`, { method: 'POST' });
+
+            const btn = document.getElementById('btn-tts');
+            if (ttsEnabled) {
+                btn.classList.add('active');
+                btn.textContent = 'Voice: ON';
+                log('Voice generation enabled.');
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = 'Voice: OFF';
+                log('Voice generation disabled.');
+            }
+        } catch (err) {
+            log(`Failed to toggle TTS: ${err.message}`);
+            ttsEnabled = !ttsEnabled;
+        }
+    }
+
+    // ── Prepare voice ──
+    async function prepareVoice() {
+        const profile = profileInput.value.trim();
+        if (!profile) {
+            log('Enter a profile name first.');
+            return;
+        }
+
+        btnPrepare.disabled = true;
+        log(`Preparing voice for '${profile}'...`);
+
+        try {
+            const res = await fetch(`/voice/prepare/${encodeURIComponent(profile)}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                log(`Voice prep failed: ${data.detail || 'Unknown error'}`);
+            } else if (data.already_existed) {
+                log(`Voice for '${profile}' already exists — ready.`);
+            } else {
+                log(`Voice reference generated for '${profile}'.`);
+            }
+        } catch (err) {
+            log(`Voice prep request failed: ${err.message}`);
+        } finally {
+            btnPrepare.disabled = false;
+        }
+    }
+
     // ── Init ──
+    // Set initial TTS button state
+    document.getElementById('btn-tts').classList.add('active');
+
     connect();
 </script>
 

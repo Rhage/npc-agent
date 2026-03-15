@@ -47,41 +47,55 @@ class VoiceManager:
     async def warmup(self):
         """
         Pre-load the CloneEngine and trigger CUDA graph capture on startup.
-        Eliminates the warmup cost from the first real player request.
-        Does nothing if TTS is unavailable or no voices directory exists.
+        Uses a representative text length to ensure graphs apply to real requests.
         """
         if not TTS_AVAILABLE:
             return
-        if not self.foundry_audio_output_path:  # ← use self. instead of the config constant
+        if not self.foundry_audio_output_path:
             return
 
-        print("[VoiceManager] Starting TTS warmup...")
-        engine = await self._get_engine()
-        if engine is None:
-            return
-
-        # Find any available reference WAV to use for warmup
         wavs = [
             f for f in os.listdir(self.voices_dir)
             if f.endswith(".wav")
         ] if os.path.exists(self.voices_dir) else []
 
         if not wavs:
-            print("[VoiceManager] No reference clips found — skipping CUDA graph warmup.")
+            print("[VoiceManager] No reference clips found — skipping TTS warmup.")
             print("[VoiceManager]   Run 'Prep Voice' from the DM console to generate one.")
             return
 
-        # Register the first available character temporarily for warmup
+        # Use the first available character
         char_id  = wavs[0].replace(".wav", "")
         ref_text = self._load_ref_text(char_id)
 
+        engine = await self._get_engine()
+        if engine is None:
+            return
+
         if char_id not in engine.loaded_characters():
-            engine.load_character(char_id, os.path.join(self.voices_dir, wavs[0]), ref_text)
+            engine.load_character(
+                char_id,
+                os.path.join(self.voices_dir, wavs[0]),
+                ref_text
+            )
+
+        # Warm up with a representative dialog length — this is what captures
+        # the CUDA graphs that will actually apply to real requests
+        warmup_text = "I've been waiting for someone like you. Let's see what you're made of. The road ahead is long, and danger lurks where you least expect it."
 
         print("[VoiceManager] Running CUDA graph warmup (expect ~15-20s)...")
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: engine.warmup())
-        print("[VoiceManager] TTS warmup complete.")
+        try:
+            import torch
+            loop = asyncio.get_event_loop()
+
+            def _run_warmup():
+                engine.generate(char_id, warmup_text, "English")
+                torch.cuda.empty_cache()
+
+            await loop.run_in_executor(None, _run_warmup)
+            print("[VoiceManager] TTS warmup complete.")
+        except Exception as e:
+            print(f"[VoiceManager] Warmup failed: {e}")
 
     @property
     def available(self) -> bool:
@@ -153,11 +167,15 @@ class VoiceManager:
         language   = voice_cfg.get("language", "English")
 
         try:
+            import torch
             loop = asyncio.get_event_loop()
-            wav_array, sr = await loop.run_in_executor(
-                None,
-                lambda: engine.generate(profile_name, text, language)
-            )
+
+            def _generate():
+                result = engine.generate(profile_name, text, language)
+                torch.cuda.empty_cache()  # free unreferenced tensors after each call
+                return result
+
+            wav_array, sr = await loop.run_in_executor(None, _generate)
         except Exception as e:
             print(f"[VoiceManager] TTS generation failed for '{profile_name}': {e}")
             return None

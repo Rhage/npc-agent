@@ -104,7 +104,7 @@ class VoiceManager:
 
     def profile_has_voice(self, profile: dict) -> bool:
         """True if the profile JSON contains a voice block."""
-        return bool(profile.get("voice"))
+        return bool(profile.get("voice_language") and profile.get("voice_description"))
 
     def reference_exists(self, profile_name: str) -> bool:
         """True if a reference WAV already exists for this profile."""
@@ -163,8 +163,7 @@ class VoiceManager:
                 return None
 
         # Generate
-        voice_cfg  = profile["voice"]
-        language   = voice_cfg.get("language", "English")
+        language = profile.get("voice_language") or "English"
 
         try:
             import torch
@@ -247,13 +246,9 @@ class VoiceManager:
 
     async def _generate_reference(self, profile_name: str, profile: dict) -> bool:
         """Generate a reference WAV for the profile using VoiceDesign."""
-        voice_cfg   = profile["voice"]
-        description = voice_cfg.get("description", "")
-        language    = voice_cfg.get("language", "English")
-        ref_phrase  = voice_cfg.get(
-            "ref_phrase",
-            "I've been waiting for someone like you. Let's see what you're made of."
-        )
+        description = profile.get("voice_description") or ""
+        language    = profile.get("voice_language") or "English"
+        ref_phrase  = profile.get("voice_ref_phrase") or "I've been waiting for someone like you. Let's see what you're made of."
 
         print(f"[VoiceManager] Generating reference clip for '{profile_name}'...")
 

@@ -43,6 +43,24 @@ CREATE TABLE IF NOT EXISTS npc_relationships (
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(npc_name, target)
 );
+
+CREATE TABLE IF NOT EXISTS npc_beliefs (
+    id              INTEGER PRIMARY KEY,
+    npc_name        TEXT NOT NULL,
+    label           TEXT NOT NULL,       -- human-readable name for DM (e.g. "The Merchants Guild")
+    terms           TEXT NOT NULL DEFAULT '',
+    subject         TEXT NOT NULL DEFAULT '',
+    source          TEXT NOT NULL DEFAULT '',
+    associations    TEXT NOT NULL DEFAULT '',
+    knowledge       TEXT NOT NULL,       -- the belief content injected into context
+    always_inject   BOOLEAN DEFAULT FALSE,
+    emb_terms        BLOB,
+    emb_subject      BLOB,
+    emb_source       BLOB,
+    emb_associations BLOB,
+    emb_knowledge    BLOB NOT NULL,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -159,6 +177,53 @@ class NPCDatabase:
         cursor = self._conn.execute(
             "DELETE FROM npc_relationships WHERE npc_name = ? AND target = ?",
             (npc_name, target)
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    # ── Belief queries ───────────────────────────────────────────────────────
+
+    def get_beliefs(self, npc_name: str) -> list[dict]:
+        """Return all beliefs for an NPC including embedding blobs."""
+        rows = self._conn.execute(
+            """SELECT id, npc_name, label, terms, subject, source, associations,
+                      knowledge, always_inject,
+                      emb_terms, emb_subject, emb_source, emb_associations, emb_knowledge
+               FROM npc_beliefs WHERE npc_name = ?
+               ORDER BY always_inject DESC, label""",
+            (npc_name,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def upsert_belief(self, belief: dict) -> int:
+        """
+        Insert or update a belief record.
+        belief must contain: npc_name, label, knowledge, emb_knowledge.
+        Optional: terms, subject, source, associations, always_inject,
+                  emb_terms, emb_subject, emb_source, emb_associations.
+        Returns the row id.
+        """
+        fields = [
+            "npc_name", "label", "terms", "subject", "source", "associations",
+            "knowledge", "always_inject",
+            "emb_terms", "emb_subject", "emb_source", "emb_associations", "emb_knowledge",
+        ]
+        columns      = ", ".join(fields)
+        placeholders = ", ".join("?" for _ in fields)
+        values       = tuple(belief.get(f) for f in fields)
+
+        cursor = self._conn.execute(
+            f"INSERT OR REPLACE INTO npc_beliefs ({columns}, updated_at) "
+            f"VALUES ({placeholders}, CURRENT_TIMESTAMP)",
+            values
+        )
+        self._conn.commit()
+        return cursor.lastrowid
+
+    def delete_belief(self, belief_id: int) -> bool:
+        """Delete a belief by id. Returns True if a row was deleted."""
+        cursor = self._conn.execute(
+            "DELETE FROM npc_beliefs WHERE id = ?", (belief_id,)
         )
         self._conn.commit()
         return cursor.rowcount > 0

@@ -15,6 +15,9 @@ PORT = int(os.getenv("PORT", "8000"))
 DB_PATH      = os.getenv("DB_PATH",      "npc_agent.db")
 PROFILES_DIR = os.getenv("PROFILES_DIR", "profiles")   # legacy JSON dir, used by migrate_profiles.py
 
+# ── Knowledge / Embeddings ──
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "multi-qa-mpnet-base-dot-v1")
+
 # ── TTS ──
 FOUNDRY_AUDIO_OUTPUT_PATH = os.getenv("FOUNDRY_AUDIO_OUTPUT_PATH", "")
 FOUNDRY_AUDIO_URL_PREFIX  = os.getenv("FOUNDRY_AUDIO_URL_PREFIX",  "modules/npc-agent/audio")

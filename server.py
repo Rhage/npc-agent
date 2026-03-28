@@ -6,18 +6,23 @@ from contextlib import asynccontextmanager
 from chat_agent import ChatAgent
 from profiles import load_profile
 from voice_manager import VoiceManager
+from knowledge_manager import KnowledgeManager
 from config import (
     HOST, PORT,
     FOUNDRY_AUDIO_OUTPUT_PATH,
     FOUNDRY_AUDIO_URL_PREFIX,
     VOICES_DIR,
     TTS_USE_LARGE_MODEL,
+    EMBEDDING_MODEL,
 )
 import uvicorn
 import asyncio
 import json
 
-agent = ChatAgent()
+# KnowledgeManager loads the embedding model — created before ChatAgent
+# so it can be passed in at construction time.
+knowledge_mgr = KnowledgeManager(EMBEDDING_MODEL)
+agent         = ChatAgent(knowledge_mgr=knowledge_mgr)
 
 voice_manager = VoiceManager(
     voices_dir                = VOICES_DIR,

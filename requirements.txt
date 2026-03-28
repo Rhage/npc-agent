@@ -6,7 +6,8 @@ requests==2.32.4
 aiofiles==25.1.0
 websockets==16.0
 
-# ── TTS ──
+# ── Knowledge / Embeddings ──
+sentence-transformers
 # Install faster-qwen3-tts and qwen-tts from their respective sources.
 # See README for install instructions — these are not on PyPI.
 # faster-qwen3-tts  (CUDA graph accelerated inference)
